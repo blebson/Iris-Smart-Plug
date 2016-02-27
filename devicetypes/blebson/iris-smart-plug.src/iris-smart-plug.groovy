@@ -157,7 +157,8 @@ def calculateAndShowEnergy()
     int h = (int) (timeDifference / (3600));
     int m = (int) ((timeDifference - (h * 3600)) / 60);
     int s = (int) (timeDifference - (h * 3600) - m * 60);
-    int d = (int) h > 24 ? h / 24 : 0
+    int d = (int) h >= 24 ? h / 24 : 0
+    h = d > 0 ? h % 24 : h
 
     sendEvent(name: "elapsedTimeDisplay", value: String.format("%dd %02d:%02d:%02d", d, h, m, s), displayed: true)
 }
