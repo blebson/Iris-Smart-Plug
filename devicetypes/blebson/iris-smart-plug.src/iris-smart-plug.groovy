@@ -21,15 +21,21 @@ metadata {
 		capability "Actuator"
 		capability "Switch"
 		capability "Power Meter"
+		capability "Energy Meter"
 		capability "Configuration"
 		capability "Refresh"
 		capability "Sensor"
-
+		
 		// indicates that device keeps track of heartbeat (in state.heartbeat)
-		attribute "heartbeat", "string"
-
+		attribute "heartbeat", "string"     
+		attribute "timerStart", "number"
+		
+		attribute "energyDisplay", "string"
+		attribute "elapsedTimeDisplay", "string"
+	
+		command "resetEnergyUsage"
 			
-        fingerprint profileId: "0104", inClusters: "0000 0003 0004 0005 0006 0B04 0B05 FC03", outClusters: "0019", manufacturer: "CentraLite",  model: "3210-L", deviceJoinName: "Outlet"
+		fingerprint profileId: "0104", inClusters: "0000 0003 0004 0005 0006 0B04 0B05 FC03", outClusters: "0019", manufacturer: "CentraLite",  model: "3210-L", deviceJoinName: "Outlet"
 		//fingerprint profileId: "0104", inClusters: "0000,0003,0004,0005,0006,0B04,0B05", outClusters: "0019", manufacturer: "CentraLite",  model: "3200", deviceJoinName: "Outlet"
 		//fingerprint profileId: "0104", inClusters: "0000,0003,0004,0005,0006,0B04,0B05", outClusters: "0019", manufacturer: "CentraLite",  model: "3200-Sgb", deviceJoinName: "Outlet"
 		//fingerprint profileId: "0104", inClusters: "0000,0003,0004,0005,0006,0B04,0B05", outClusters: "0019", manufacturer: "CentraLite",  model: "4257050-RZHAC", deviceJoinName: "Outlet"
@@ -69,13 +75,25 @@ metadata {
 				attributeState "power", label:'${currentValue} W'
 			}
 		}
-
-		standardTile("refresh", "device.power", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
-			state "default", label:'', action:"refresh.refresh", icon:"st.secondary.refresh"
+        
+		valueTile("energyDisplay", "device.energyDisplay", width: 4, height: 1, decoration: "flat") {
+			state "default", label:'Energy used: ${currentValue}', unit: "kWh"
+        	}
+        	
+		standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat", width: 2, height: 1) {
+			state "default", label:"", action:"refresh.refresh", icon:"st.secondary.refresh"
 		}
-
+        
+		standardTile("resetUsage", "command.resetEnergyUsage", decoration: "flat", width: 2, height: 1){
+			state "default", action: "resetEnergyUsage", label:'Reset kWh', icon:"st.Health & Wellness.health7"
+		}        
+        
+		valueTile("elapsedTimeDisplay", "device.elapsedTimeDisplay", decoration: "flat", width: 4, height: 1){
+			state "default", label: 'Time: ${currentValue}', unit: "h"
+		}      
+        
 		main "switch"
-		details(["switch","refresh"])
+		details(["switch","energyDisplay","resetUsage","power","elapsedTimeDisplay","refresh"])
 	}
 }
 
@@ -85,6 +103,11 @@ def parse(String description) {
 
 	// save heartbeat (i.e. last time we got a message from device)
 	state.heartbeat = Calendar.getInstance().getTimeInMillis()
+	if (state.timerStart == null)
+	{
+		state.timerStart = Calendar.getInstance().getTimeInMillis()
+		state.energy = 0.0
+	}
 
 	def finalResult = zigbee.getKnownDescription(description)
 
@@ -98,14 +121,14 @@ def parse(String description) {
 			log.info "$device updates: ${finalResult.value}"
 		}
 		else if (finalResult.type == "power") {
-			def powerValue = (finalResult.value as Integer)/10
+			def powerValue = (finalResult.value as Integer)/10           
 			sendEvent(name: "power", value: powerValue)
 			/*
 				Dividing by 10 as the Divisor is 10000 and unit is kW for the device. AttrId: 0302 and 0300. Simplifying to 10
-
 				power level is an integer. The exact power level with correct units needs to be handled in the device type
 				to account for the different Divisor value (AttrId: 0302) and POWER Unit (AttrId: 0300). CLUSTER for simple metering is 0702
-			*/
+			*/           
+			calculateAndShowEnergy()
 		}
 		else {
 			sendEvent(name: finalResult.type, value: finalResult.value)
@@ -117,12 +140,39 @@ def parse(String description) {
 	}
 }
 
+def calculateAndShowEnergy()
+{
+    def recentEvents = device.statesSince("power", new Date()-1, [max: 2]).collect {[value: it.value as float, date: it.date]}        	
+    def deltaT = (recentEvents[0].date.getTime() - recentEvents[1].date.getTime()) // time since last "power" event in milliseconds
+    deltaT = deltaT / 3600000 // convert to hours
+    
+    def energyValue = device.currentValue("energy") 
+    energyValue += (recentEvents[1].value * deltaT) / 1000 // energy used since last "power" event in kWh 
+    
+    sendEvent(name: "energy", value: energyValue, displayed: false)
+    sendEvent(name: "energyDisplay", value: String.format("%6.3f kWh",energyValue), displayed: true)
+
+    def currentTime = Calendar.getInstance().getTimeInMillis()   
+    def timeDifference = ((long)currentTime - state.timerStart)/1000; // in seconds
+    int h = (int) (timeDifference / (3600));
+    int m = (int) ((timeDifference - (h * 3600)) / 60);
+    int s = (int) (timeDifference - (h * 3600) - m * 60);
+    int d = (int) h > 24 ? h / 24 : 0
+
+    sendEvent(name: "elapsedTimeDisplay", value: String.format("%dd %02d:%02d:%02d", d, h, m, s), displayed: true)
+}
+
 def off() {
 	zigbee.off()
 }
 
 def on() {
 	zigbee.on()
+}
+
+def resetEnergyUsage() {
+	sendEvent(name: "energy", value: 0.0)
+	state.timerStart = Calendar.getInstance().getTimeInMillis()
 }
 
 def refresh() {
