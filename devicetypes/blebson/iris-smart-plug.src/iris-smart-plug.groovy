@@ -174,6 +174,8 @@ def on() {
 def resetEnergyUsage() {
 	sendEvent(name: "energy", value: 0.0)
 	state.timerStart = Calendar.getInstance().getTimeInMillis()
+	sendEvent(name: "energyDisplay", value: String.format("%6.3f kWh",0.0), displayed: false)
+	sendEvent(name: "elapsedTimeDisplay", value: String.format("%dd %02d:%02d:%02d", 0, 0, 0, 0), displayed: false)
 }
 
 def refresh() {
