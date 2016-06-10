@@ -147,7 +147,9 @@ def calculateAndShowEnergy()
     deltaT = deltaT / 3600000 // convert to hours
     
     def energyValue = device.currentValue("energy") 
-    energyValue += (recentEvents[1].value * deltaT) / 1000 // energy used since last "power" event in kWh 
+    if(energyValue) {
+    	energyValue += (recentEvents[1].value * deltaT) / 1000 // energy used since last "power" event in kWh 
+    }
     
     sendEvent(name: "energy", value: energyValue, displayed: false)
     sendEvent(name: "energyDisplay", value: String.format("%6.3f kWh",energyValue), displayed: true)
