@@ -122,7 +122,7 @@ def parse(String description) {
 		}
 		else if (finalResult.type == "power") {
 			def powerValue = (finalResult.value as Integer)/10           
-			sendEvent(name: "power", value: powerValue)
+			sendEvent(name: "power", value: powerValue, isStateChange: true) // note: stateChange = true added so the energy calculation can work properly
 			/*
 				Dividing by 10 as the Divisor is 10000 and unit is kW for the device. AttrId: 0302 and 0300. Simplifying to 10
 				power level is an integer. The exact power level with correct units needs to be handled in the device type
