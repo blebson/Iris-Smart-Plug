@@ -122,7 +122,7 @@ def parse(String description) {
 		}
 		else if (finalResult.type == "power") {
 			def powerValue = (finalResult.value as Integer)/10           
-			sendEvent(name: "power", value: powerValue, isStateChange: true) // note: stateChange = true added so the energy calculation can work properly
+			sendEvent(name: "power", value: powerValue, isStateChange: true, displayed: false) // note: stateChange = true added so the energy calculation can work properly
 			/*
 				Dividing by 10 as the Divisor is 10000 and unit is kW for the device. AttrId: 0302 and 0300. Simplifying to 10
 				power level is an integer. The exact power level with correct units needs to be handled in the device type
@@ -147,12 +147,12 @@ def calculateAndShowEnergy()
     deltaT = deltaT / 3600000 // convert to hours
     
     def energyValue = device.currentValue("energy") 
-    if(energyValue) {
+    if(energyValue != null) {
     	energyValue += (recentEvents[1].value * deltaT) / 1000 // energy used since last "power" event in kWh 
     }
     
     sendEvent(name: "energy", value: energyValue, displayed: false)
-    sendEvent(name: "energyDisplay", value: String.format("%6.3f kWh",energyValue), displayed: true)
+    sendEvent(name: "energyDisplay", value: String.format("%6.3f kWh",energyValue), displayed: false)
 
     def currentTime = Calendar.getInstance().getTimeInMillis()   
     def timeDifference = ((long)currentTime - state.timerStart)/1000; // in seconds
@@ -162,7 +162,7 @@ def calculateAndShowEnergy()
     int d = (int) h >= 24 ? h / 24 : 0
     h = d > 0 ? h % 24 : h
 
-    sendEvent(name: "elapsedTimeDisplay", value: String.format("%dd %02d:%02d:%02d", d, h, m, s), displayed: true)
+    sendEvent(name: "elapsedTimeDisplay", value: String.format("%dd %02d:%02d:%02d", d, h, m, s), displayed: false)
 }
 
 def off() {
@@ -174,7 +174,7 @@ def on() {
 }
 
 def resetEnergyUsage() {
-	sendEvent(name: "energy", value: 0.0)
+	sendEvent(name: "energy", value: 0.0, displayed: false)
 	state.timerStart = Calendar.getInstance().getTimeInMillis()
 	sendEvent(name: "energyDisplay", value: String.format("%6.3f kWh",0.0), displayed: false)
 	sendEvent(name: "elapsedTimeDisplay", value: String.format("%dd %02d:%02d:%02d", 0, 0, 0, 0), displayed: false)
