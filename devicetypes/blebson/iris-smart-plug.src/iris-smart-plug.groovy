@@ -60,6 +60,11 @@ metadata {
 				"http://cdn.device-gse.smartthings.com/Outlet/US/OutletUS2.jpg"
 				])
 		}
+
+	        section("Reporting Intervals") {
+	        	input "intervalMin", "number", title: "Minimum interval between reports [s]", defaultValue: 30, range: "1..600"
+	        	input "intervalMax", "number", title: "Maximum interval between reports [s]", defaultValue: 600, range: "1..600"
+	        }
 	}
 
 	// UI tile definitions
@@ -194,7 +199,7 @@ def configure() {
 def powerConfig() {
 	[
 		"zdo bind 0x${device.deviceNetworkId} 1 ${endpointId} 0x0B04 {${device.zigbeeId}} {}", "delay 200",
-		"zcl global send-me-a-report 0x0B04 0x050B 0x29 1 600 {05 00}",				//The send-me-a-report is custom to the attribute type for CentraLite
+		"zcl global send-me-a-report 0x0B04 0x050B 0x29 ${intervalMin ?: 30} ${intervalMax ?: 600} {05 00}",				//The send-me-a-report is custom to the attribute type for CentraLite
 		"send 0x${device.deviceNetworkId} 1 ${endpointId}", "delay 500"
 	]
 }
