@@ -60,11 +60,11 @@ metadata {
 				"http://cdn.device-gse.smartthings.com/Outlet/US/OutletUS2.jpg"
 				])
 		}
-
-	        section("Reporting Intervals") {
-	        	input "intervalMin", "number", title: "Minimum interval between reports [s]", defaultValue: 30, range: "1..600"
-	        	input "intervalMax", "number", title: "Maximum interval between reports [s]", defaultValue: 600, range: "1..600"
-	        }
+        
+        section("Reporting Intervals") {
+        	input "intervalMin", "number", title: "Minimum interval between reports [s]", defaultValue: 5, range: "1..600"
+        	input "intervalMax", "number", title: "Maximum interval between reports [s]", defaultValue: 600, range: "1..600"
+        }
 	}
 
 	// UI tile definitions
@@ -81,22 +81,26 @@ metadata {
 			}
 		}
         
-		valueTile("energyDisplay", "device.energyDisplay", width: 4, height: 1, decoration: "flat") {
+		valueTile("energyDisplay", "device.energyDisplay", width: 5, height: 1, decoration: "flat") {
 			state "default", label:'Energy used: ${currentValue}', unit: "kWh"
         	}
         	
-		standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat", width: 2, height: 1) {
+		standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat", width: 1, height: 1) {
 			state "default", label:"", action:"refresh.refresh", icon:"st.secondary.refresh"
 		}
         
-		standardTile("resetUsage", "command.resetEnergyUsage", decoration: "flat", width: 2, height: 1){
+		standardTile("resetUsage", "command.resetEnergyUsage", decoration: "flat", width: 1, height: 1){
 			state "default", action: "resetEnergyUsage", label:'Reset kWh', icon:"st.Health & Wellness.health7"
 		}        
         
-		valueTile("elapsedTimeDisplay", "device.elapsedTimeDisplay", decoration: "flat", width: 4, height: 1){
+		valueTile("elapsedTimeDisplay", "device.elapsedTimeDisplay", decoration: "flat", width: 5, height: 1){
 			state "default", label: 'Time: ${currentValue}', unit: "h"
 		}      
-        
+
+		standardTile("configure", "device.switch", inactiveLabel: false, decoration: "flat", width: 1, height: 1) {
+			state "default", label:"", action:"configure", icon:"st.secondary.configure"
+		}
+
 		main "switch"
 		details(["switch","energyDisplay","resetUsage","power","elapsedTimeDisplay","refresh"])
 	}
@@ -187,11 +191,16 @@ def resetEnergyUsage() {
 
 def refresh() {
 	sendEvent(name: "heartbeat", value: "alive", displayed:false)
-	zigbee.onOffRefresh() + zigbee.refreshData("0x0B04", "0x050B")
+	return zigbee.onOffRefresh() + zigbee.refreshData("0x0B04", "0x050B")
 }
 
 def configure() {
-	zigbee.onOffConfig() + powerConfig() + refresh()
+	log.debug "Configuring..."
+	return zigbee.onOffConfig() + powerConfig() + refresh()
+}
+
+def updated() {
+	response(configure())
 }
 
 //power config for devices with min reporting interval as 1 seconds and reporting interval if no activity as 10min (600s)
@@ -199,7 +208,7 @@ def configure() {
 def powerConfig() {
 	[
 		"zdo bind 0x${device.deviceNetworkId} 1 ${endpointId} 0x0B04 {${device.zigbeeId}} {}", "delay 200",
-		"zcl global send-me-a-report 0x0B04 0x050B 0x29 ${intervalMin ?: 30} ${intervalMax ?: 600} {05 00}",				//The send-me-a-report is custom to the attribute type for CentraLite
+		"zcl global send-me-a-report 0x0B04 0x050B 0x29 ${intervalMin ?: 5} ${intervalMax ?: 600} {05 00}",				//The send-me-a-report is custom to the attribute type for CentraLite
 		"send 0x${device.deviceNetworkId} 1 ${endpointId}", "delay 500"
 	]
 }
