@@ -33,6 +33,11 @@ metadata {
 		attribute "energyDisplay", "string"
 		attribute "elapsedTimeDisplay", "string"
 	
+		attribute "electricityDollarCostDisplay", "string"
+		attribute "electricityDollarCostPerHourDisplay", "string"
+		attribute "electricityDollarCostPer8HourDisplay", "string"
+		attribute "electricityDollarCostPer30DaysDisplay", "string"
+			
 		command "resetEnergyUsage"
 			
 		fingerprint profileId: "0104", inClusters: "0000 0003 0004 0005 0006 0B04 0B05 FC03", outClusters: "0019", manufacturer: "CentraLite",  model: "3210-L", deviceJoinName: "Outlet"
@@ -65,6 +70,9 @@ metadata {
         	input "intervalMin", "number", title: "Minimum interval between reports [s]", defaultValue: 5, range: "1..600"
         	input "intervalMax", "number", title: "Maximum interval between reports [s]", defaultValue: 600, range: "1..600"
         }
+		section("Electricity Rate"){
+			input "electricityRateCents", "decimal", title: "Electricity Rate (cents/kWh)", defaultValue: 10.26, range: "0..100"
+		}
 	}
 
 	// UI tile definitions
@@ -100,9 +108,25 @@ metadata {
 		standardTile("configure", "device.switch", inactiveLabel: false, decoration: "flat", width: 1, height: 1) {
 			state "default", label:"", action:"configure", icon:"st.secondary.configure"
 		}
+		
+		valueTile("electricityDollarCostDisplay", "device.electricityDollarCostDisplay", width: 3, height: 1, decoration: "flat") {
+			state "default", label:'Cost: ${currentValue}', unit: "\$"
+		}
+		
+		valueTile("electricityDollarCostPerHourDisplay", "device.electricityDollarCostPerHourDisplay", width:3, height: 1, decoration: "flat") {
+			state "default", label:'Per Hour: ${currentValue}', unit: "\$"
+		}
+		
+		valueTile("electricityDollarCostPer8HourDisplay", "device.electricityDollarCostPer8HourDisplay", width:3, height: 1, decoration: "flat") {
+			state "default", label:'8 Hours: ${currentValue}', unit: "\$"
+		}
+		
+		valueTile("electricityDollarCostPer30DaysDisplay", "device.electricityDollarCostPer30DaysDisplay", width:3, height: 1, decoration: "flat") {
+			state "default", label:'30 Days: ${currentValue}', unit: "\$"
+		}
 
 		main "switch"
-		details(["switch","energyDisplay","resetUsage","power","elapsedTimeDisplay","refresh"])
+		details(["switch","energyDisplay","resetUsage","power","elapsedTimeDisplay","refresh", "electricityDollarCostDisplay", "electricityDollarCostPerHourDisplay", "electricityDollarCostPer8HourDisplay", "electricityDollarCostPer30DaysDisplay" ])
 	}
 }
 
@@ -172,6 +196,17 @@ def calculateAndShowEnergy()
     h = d > 0 ? h % 24 : h
 
     sendEvent(name: "elapsedTimeDisplay", value: String.format("%dd %02d:%02d:%02d", d, h, m, s), displayed: false)
+	
+	def electricityRateCentsLocal = electricityRateCents ?: 10.26 
+    def costValue = energyValue * electricityRateCentsLocal / 100   // energyUsed * rateCentsPerkWh / 100 =  dollar cost
+	def costPerHourValue = costValue * 3600 / timeDifference
+	def costPer8HourValue = costPerHourValue * 8
+	def costPer30DaysValue = costPerHourValue * 24 * 30
+	
+	sendEvent(name: "electricityDollarCostDisplay", value: String.format("%6.4f \$",costValue), displayed: false)
+	sendEvent(name: "electricityDollarCostPerHourDisplay", value: String.format("%6.4f \$",costPerHourValue), displayed: false)
+	sendEvent(name: "electricityDollarCostPer8HourDisplay", value: String.format("%6.4f \$",costPer8HourValue), displayed: false)
+	sendEvent(name: "electricityDollarCostPer30DaysDisplay", value: String.format("%6.4f \$",costPer30DaysValue), displayed: false)
 }
 
 def off() {
@@ -187,6 +222,10 @@ def resetEnergyUsage() {
 	state.timerStart = Calendar.getInstance().getTimeInMillis()
 	sendEvent(name: "energyDisplay", value: String.format("%6.3f kWh",0.0), displayed: false)
 	sendEvent(name: "elapsedTimeDisplay", value: String.format("%dd %02d:%02d:%02d", 0, 0, 0, 0), displayed: false)
+	sendEvent(name: "electricityDollarCostDisplay", value: String.format("%6.4f \$",0.0), displayed: false)
+	sendEvent(name: "electricityDollarCostPerHourDisplay", value: String.format("%6.4f \$",0.0), displayed: false)
+	sendEvent(name: "electricityDollarCostPer8HourDisplay", value: String.format("%6.4f \$",0.0), displayed: false)
+	sendEvent(name: "electricityDollarCostPer30DaysDisplay", value: String.format("%6.4f \$",0.0), displayed: false)
 }
 
 def refresh() {
